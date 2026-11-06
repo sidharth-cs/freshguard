@@ -18,6 +18,8 @@ re-checks them on the live web with [Tavily](https://tavily.com), and tells you 
 
 <img src="docs/demo-python.jpg" alt="FreshGuard demo: the model says Python 3.13.0 is the latest stable version; FreshGuard marks the claim changed, now Python 3.14.3, with a source link" width="760">
 
+▶ **[Watch the 48-second live demo](docs/demo.mp4)**: two real questions through Bifrost, both caught out of date with sources.
+
 </div>
 
 ---
