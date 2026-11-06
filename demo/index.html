@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FreshGuard demo</title>
+<style>
+  :root {
+    --bg: #f6f4ef; --panel: #fffdf8; --ink: #1d1b16; --muted: #6b665a; --line: #e3ddd0;
+    --accent: #1f4fd1; --changed: #b4400f; --changed-bg: #fbe9df; --ok: #2f7a3b; --ok-bg: #e3f1e3;
+    --unk: #6b665a; --unk-bg: #eeebe3;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15140f; --panel: #1d1c16; --ink: #ece7da; --muted: #a39d8c; --line: #34322a;
+      --accent: #8aa8ff; --changed: #ff9a66; --changed-bg: #3a2418; --ok: #7fd08a; --ok-bg: #1e3321;
+      --unk: #a39d8c; --unk-bg: #2a2922;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 Georgia, "Iowan Old Style", serif; }
+  main { max-width: 1080px; margin: 0 auto; padding: 40px 16px 64px; }
+  header h1 { font-size: 40px; line-height: 1.1; margin: 0 0 8px; letter-spacing: -0.02em; }
+  header p { margin: 0; color: var(--muted); max-width: 640px; font-family: system-ui, sans-serif; font-size: 15px; }
+  .ui { font-family: system-ui, -apple-system, sans-serif; }
+  form { display: flex; gap: 8px; margin: 28px 0 12px; }
+  input[type=text] { flex: 1; min-width: 0; padding: 12px 14px; font: inherit; font-size: 16px; border: 1px solid var(--line);
+    border-radius: 8px; background: var(--panel); color: var(--ink); }
+  button { padding: 12px 18px; font: 600 15px system-ui, sans-serif; border: 0; border-radius: 8px; background: var(--ink);
+    color: var(--bg); cursor: pointer; }
+  button:disabled { opacity: .5; cursor: wait; }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 28px; }
+  .presets button { background: transparent; color: var(--muted); border: 1px solid var(--line); font-weight: 500; padding: 6px 10px; font-size: 13px; }
+  .presets button:hover { color: var(--ink); border-color: var(--muted); }
+  .grid { display: grid; grid-template-columns: 1fr 1.3fr; gap: 20px; }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } form { flex-direction: column; } }
+  section.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; min-height: 160px; }
+  .label { font: 600 12px system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; }
+  .answer { font-size: 19px; white-space: pre-wrap; }
+  .score { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+  .score b { font: 700 48px system-ui, sans-serif; letter-spacing: -0.03em; }
+  .score span { color: var(--muted); font: 14px system-ui, sans-serif; }
+  .bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-bottom: 18px; }
+  .bar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .4s; }
+  .claim { border-top: 1px solid var(--line); padding: 14px 0; }
+  .claim:first-of-type { border-top: 0; }
+  .pill { display: inline-block; font: 700 11px system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 999px; margin-bottom: 6px; }
+  .pill.changed { color: var(--changed); background: var(--changed-bg); }
+  .pill.supported { color: var(--ok); background: var(--ok-bg); }
+  .pill.unverifiable { color: var(--unk); background: var(--unk-bg); }
+  .claim .text { font-size: 17px; }
+  .claim .now { font: 600 15px system-ui, sans-serif; margin-top: 4px; }
+  .claim .why { color: var(--muted); font: 14px system-ui, sans-serif; margin-top: 4px; }
+  .claim .src { font: 13px system-ui, sans-serif; margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+  .claim .src a { color: var(--accent); overflow-wrap: anywhere; }
+  .pipeline { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; font: 12px var(--mono); color: var(--muted); }
+  .pipeline span { border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+  .muted { color: var(--muted); font: 15px system-ui, sans-serif; }
+  .error { color: var(--changed); font: 14px system-ui, sans-serif; white-space: pre-wrap; }
+  footer { margin-top: 32px; color: var(--muted); font: 13px system-ui, sans-serif; }
+  code { font-family: var(--mono); font-size: .9em; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>FreshGuard</h1>
+    <p>Ask the model anything time-sensitive. The answer goes through a Bifrost gateway, where FreshGuard pulls out
+      claims that may have gone stale, re-checks them on the live web with Tavily, and reports what changed.</p>
+  </header>
+
+  <form id="ask" class="ui">
+    <input id="q" type="text" maxlength="500" autocomplete="off" aria-label="Question"
+           placeholder="e.g. What is the latest stable version of Python?">
+    <button id="go" type="submit">Ask</button>
+  </form>
+  <div class="presets ui" id="presets" aria-label="Example questions"></div>
+
+  <div class="grid">
+    <section class="panel" aria-live="polite">
+      <p class="label">Model answer — what users see today</p>
+      <div id="answer" class="answer muted">Ask a question to start.</div>
+    </section>
+    <section class="panel" aria-live="polite">
+      <p class="label">FreshGuard report</p>
+      <div id="report" class="muted">The freshness check appears here.</div>
+    </section>
+  </div>
+
+  <footer>
+    Model: Gemini via Bifrost · Search: Tavily through the Bifrost relay · Report from the
+    <code>freshguard</code> field and <code>X-FreshGuard-*</code> headers of the same response.
+  </footer>
+</main>
+
+<script>
+const PRESETS = [
+  "What is the latest stable version of Python?",
+  "Who is the current Prime Minister of the United Kingdom?",
+  "What is the newest iPhone?",
+  "What is the latest long-term support version of Java?",
+  "Who won the most recent FIFA men's World Cup?",
+];
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+
+for (const p of PRESETS) {
+  const b = el("button", null, p);
+  b.type = "button";
+  b.onclick = () => { $("q").value = p; ask(); };
+  $("presets").append(b);
+}
+$("ask").onsubmit = (e) => { e.preventDefault(); ask(); };
+
+function answerText(data) {
+  const c = data?.choices?.[0]?.message?.content;
+  if (typeof c === "string") return c;
+  if (Array.isArray(c)) return c.map((b) => b.text || "").join("\n");
+  return "";
+}
+
+function safeLink(url) {
+  try { const u = new URL(url); return u.protocol === "http:" || u.protocol === "https:" ? u : null; } catch { return null; }
+}
+
+function renderReport(fg) {
+  const box = $("report");
+  box.className = "";
+  box.replaceChildren();
+  if (!fg) { box.append(el("div", "muted", "No report on this response (FreshGuard not enabled for this key?).")); return; }
+  if (fg.status === "error") { box.append(el("div", "error", "Check failed, answer passed through unchanged:\n" + fg.error)); return; }
+
+  const score = el("div", "score");
+  score.append(el("b", null, Math.round(fg.score * 100) + "%"),
+    el("span", null, fg.status === "no_claims" ? "fresh — no time-sensitive claims found"
+      : `fresh · ${fg.stale} of ${fg.claims.length} claim${fg.claims.length === 1 ? "" : "s"} out of date`));
+  const bar = el("div", "bar"); const fill = el("i"); bar.append(fill);
+  box.append(score, bar);
+  requestAnimationFrame(() => { fill.style.width = Math.max(0, fg.score) * 100 + "%"; });
+
+  for (const c of fg.claims) {
+    const card = el("div", "claim");
+    card.append(el("span", "pill " + c.verdict, c.verdict), el("div", "text", c.claim));
+    if (c.verdict === "changed" && c.current_value) card.append(el("div", "now", "Now: " + c.current_value));
+    if (c.explanation) card.append(el("div", "why", c.explanation));
+    if (c.sources?.length) {
+      const src = el("div", "src");
+      for (const s of c.sources) {
+        const u = safeLink(s); if (!u) continue;
+        const a = el("a", null, u.hostname.replace(/^www\./, ""));
+        a.href = u.href; a.target = "_blank"; a.rel = "noopener noreferrer";
+        src.append(a);
+      }
+      card.append(src);
+    }
+    box.append(card);
+  }
+
+  const t = fg.timings_ms || {};
+  const pipe = el("div", "pipeline");
+  pipe.append(el("span", null, `extract ${t.extract ?? 0} ms`), el("span", null, `search ${t.search ?? 0} ms`),
+    el("span", null, `judge ${t.judge ?? 0} ms`), el("span", null, `total ${fg.latency_ms} ms`));
+  box.append(pipe);
+}
+
+async function ask() {
+  const q = $("q").value.trim();
+  if (!q) return;
+  $("go").disabled = true;
+  $("answer").className = "answer muted"; $("answer").textContent = "Asking the model…";
+  $("report").className = "muted"; $("report").textContent = "Waiting for the answer, then checking claims on the live web…";
+  try {
+    const res = await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question: q }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    $("answer").className = "answer";
+    $("answer").textContent = answerText(data) || "(empty answer)";
+    renderReport(data.freshguard);
+  } catch (err) {
+    $("answer").className = "error"; $("answer").textContent = String(err.message || err);
+    $("report").className = "muted"; $("report").textContent = "No report.";
+  } finally {
+    $("go").disabled = false;
+  }
+}
+</script>
+</body>
+</html>
