@@ -40,6 +40,7 @@ type Config struct {
 	Trigger      string   `json:"trigger"`      // "header" (opt-in per request) or "always"
 	VirtualKeys  []string `json:"virtual_keys"` // Bifrost virtual keys (literal or "env.NAME") whose requests are always checked
 	TimeoutSec   int      `json:"timeout_seconds"`
+	CacheTTLMin  int      `json:"cache_ttl_minutes"` // reuse verified claims this long; 0 disables the cache
 }
 
 func defaultConfig() Config {
@@ -52,6 +53,7 @@ func defaultConfig() Config {
 		MaxClaims:   5,
 		Trigger:     "header",
 		TimeoutSec:  30,
+		CacheTTLMin: 60,
 	}
 }
 
@@ -59,6 +61,10 @@ var (
 	cfg     = defaultConfig()
 	checker *Checker
 	client  = &http.Client{}
+
+	// Swappable in tests.
+	newChat   = gatewayChat
+	newSearch = tavilySearch
 )
 
 // Init is called once by Bifrost with the plugin's config block.
@@ -89,6 +95,9 @@ func Init(config any) error {
 	cfg = c
 	client = &http.Client{Timeout: time.Duration(c.TimeoutSec) * time.Second}
 	checker = &Checker{MaxClaims: c.MaxClaims}
+	if c.CacheTTLMin > 0 {
+		checker.Cache = NewClaimCache(time.Duration(c.CacheTTLMin) * time.Minute)
+	}
 	return nil
 }
 
@@ -107,18 +116,70 @@ func HTTPTransportPostHook(ctx *schemas.BifrostContext, req *schemas.HTTPRequest
 		return nil
 	}
 
-	runCtx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.TimeoutSec)*time.Second)
-	defer cancel()
-	// Forward the caller's virtual key so FreshGuard's own model and search calls are
-	// governed and billed under the same key as the request that triggered them.
-	vk := requestVK(req)
-	c := *checker
-	c.Chat = gatewayChat(vk)
-	c.Search = tavilySearch(vk)
-	report := c.Check(runCtx, answer)
-
-	attachReport(resp, body, report)
+	attachReport(resp, body, runCheck(requestVK(req), answer))
 	return nil
+}
+
+// runCheck checks one answer. The caller's virtual key is forwarded so FreshGuard's own
+// model and search calls are governed and billed under the key that triggered them.
+func runCheck(vk, answer string) Report {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.TimeoutSec)*time.Second)
+	defer cancel()
+	c := *checker
+	c.Chat = newChat(vk)
+	c.Search = newSearch(vk)
+	return c.Check(ctx, answer)
+}
+
+type streamKey struct{}
+
+// streamState collects one streamed answer across chunks.
+type streamState struct {
+	on     bool
+	answer strings.Builder
+}
+
+// HTTPTransportStreamChunkHook handles streamed chat completions: it collects the text
+// deltas and, on the chunk that carries finish_reason, checks the full answer and puts the
+// report on that last chunk at extra_fields.raw_response.freshguard. Earlier chunks pass
+// through untouched, so users still see tokens as they arrive; only the last chunk waits.
+func HTTPTransportStreamChunkHook(ctx *schemas.BifrostContext, req *schemas.HTTPRequest, chunk *schemas.BifrostStreamChunk) (*schemas.BifrostStreamChunk, error) {
+	if ctx == nil || chunk == nil || chunk.BifrostChatResponse == nil || len(chunk.BifrostChatResponse.Choices) == 0 {
+		return chunk, nil
+	}
+	st, _ := ctx.Value(streamKey{}).(*streamState)
+	if st == nil {
+		st = &streamState{on: streamEligible(req)}
+		ctx.SetValue(streamKey{}, st)
+	}
+	if !st.on {
+		return chunk, nil
+	}
+	choice := chunk.BifrostChatResponse.Choices[0]
+	if choice.ChatStreamResponseChoice != nil && choice.Delta != nil && choice.Delta.Content != nil {
+		st.answer.WriteString(*choice.Delta.Content)
+	}
+	if choice.FinishReason == nil || *choice.FinishReason == "" {
+		return chunk, nil
+	}
+	st.on = false
+	answer := st.answer.String()
+	if strings.TrimSpace(answer) == "" {
+		return chunk, nil
+	}
+	// ponytail: raw_response is the only free-form field a chunk carries; a plugin-metadata
+	// field in Bifrost would be cleaner (raised in the upstream proposal).
+	meta := map[string]any{"freshguard": runCheck(requestVK(req), answer)}
+	if chunk.BifrostChatResponse.ExtraFields.RawResponse != nil {
+		meta["provider"] = chunk.BifrostChatResponse.ExtraFields.RawResponse
+	}
+	chunk.BifrostChatResponse.ExtraFields.RawResponse = meta
+	return chunk, nil
+}
+
+func streamEligible(req *schemas.HTTPRequest) bool {
+	return req != nil && checker != nil && strings.HasSuffix(req.Path, "/chat/completions") &&
+		req.CaseInsensitiveHeaderLookup(headerInternal) == "" && wantsCheck(req)
 }
 
 // attachReport writes the report into the response body and score headers.
@@ -154,7 +215,7 @@ func eligible(req *schemas.HTTPRequest, resp *schemas.HTTPResponse) (string, map
 		Stream bool `json:"stream"`
 	}
 	if json.Unmarshal(req.Body, &reqBody) == nil && reqBody.Stream {
-		return "", nil, false // ponytail: streaming unsupported in MVP
+		return "", nil, false // streamed answers are checked in HTTPTransportStreamChunkHook
 	}
 	var body map[string]any
 	if err := json.Unmarshal(resp.Body, &body); err != nil {
@@ -227,7 +288,7 @@ func gatewayChat(virtualKey string) ChatFunc {
 // tavilySearch returns a SearchFunc for Tavily's /search endpoint, called directly or
 // through a Bifrost relay (tavily_url = "<gateway_url>/relay/<name>").
 func tavilySearch(virtualKey string) SearchFunc {
-	return func(ctx context.Context, query string) ([]Evidence, error) {
+	return func(ctx context.Context, query string, domains []string) ([]Evidence, error) {
 		headers := map[string]string{}
 		if cfg.TavilyAPIKey != "" {
 			headers["Authorization"] = "Bearer " + cfg.TavilyAPIKey
@@ -239,6 +300,9 @@ func tavilySearch(virtualKey string) SearchFunc {
 		payload := map[string]any{"query": query, "max_results": maxResultsPerSearch, "search_depth": cfg.SearchDepth}
 		if cfg.TimeRange != "" {
 			payload["time_range"] = cfg.TimeRange
+		}
+		if len(domains) > 0 {
+			payload["include_domains"] = domains
 		}
 		var out struct {
 			Results []Evidence `json:"results"`

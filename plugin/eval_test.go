@@ -49,12 +49,14 @@ func TestEval(t *testing.T) {
 	if err := json.Unmarshal(raw, &cases); err != nil {
 		t.Fatal(err)
 	}
-	if only := os.Getenv("FG_ONLY"); only != "" { // debug one case: FG_ONLY=c06
+	if only := os.Getenv("FG_ONLY"); only != "" { // subset: FG_ONLY=c06,s14
+		var subset []evalCase
 		for _, ec := range cases {
-			if ec.ID == only {
-				cases = []evalCase{ec}
+			if strings.Contains(","+only+",", ","+ec.ID+",") {
+				subset = append(subset, ec)
 			}
 		}
+		cases = subset
 	}
 	vkRaw, err := os.ReadFile("../run/demo_vk")
 	if err != nil {

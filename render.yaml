@@ -1,0 +1,19 @@
+# One-click hosted demo on Render (free plan). Click "Deploy to Render" in the README,
+# then paste GEMINI_API_KEY and TAVILY_API_KEY when Render asks. Render sets $PORT;
+# the demo page listens on it, and the gateway stays private inside the container.
+services:
+  - type: web
+    name: freshguard-demo
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: DEMO_MAX_PER_MIN
+        value: "10"
+      - key: DEMO_REQ_PER_DAY
+        value: "600"

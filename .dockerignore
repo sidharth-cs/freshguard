@@ -1,0 +1,7 @@
+.git
+.bifrost
+run
+.env
+*.so
+docs
+eval

@@ -1,0 +1,9 @@
+# One command: docker compose up --build   ->   http://localhost:8000
+# Needs GEMINI_API_KEY and TAVILY_API_KEY in .env (copy .env.example).
+services:
+  freshguard:
+    build: .
+    env_file: .env
+    ports:
+      - "127.0.0.1:8000:8000"   # demo page only; the gateway and its admin UI stay inside the container
+    restart: unless-stopped

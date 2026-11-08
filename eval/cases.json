@@ -1,34 +1,187 @@
 [
-  {"id": "s01", "expect": "stale", "answer": "The latest stable version of Python is 3.11."},
-  {"id": "s02", "expect": "stale", "answer": "The newest iPhone you can buy is the iPhone 15."},
-  {"id": "s03", "expect": "stale", "answer": "The current Prime Minister of the United Kingdom is Rishi Sunak."},
-  {"id": "s04", "expect": "stale", "answer": "Twitter's CEO is Parag Agrawal."},
-  {"id": "s05", "expect": "stale", "answer": "The latest long-term support release of Ubuntu is 22.04 LTS."},
-  {"id": "s06", "expect": "stale", "answer": "The latest major version of React is React 17."},
-  {"id": "s07", "expect": "stale", "answer": "OpenAI's most advanced publicly available model is GPT-4."},
-  {"id": "s08", "expect": "stale", "answer": "The reigning FIFA men's World Cup champion is France."},
-  {"id": "s09", "expect": "stale", "answer": "The newest Node.js LTS line is Node 18."},
-  {"id": "s10", "expect": "stale", "answer": "Windows 10 is Microsoft's newest desktop operating system."},
-  {"id": "s11", "expect": "stale", "answer": "The US Federal Reserve's target for the federal funds rate is 0 to 0.25 percent."},
-  {"id": "s12", "expect": "stale", "answer": "The Secretary-General of the United Nations is Ban Ki-moon."},
-  {"id": "s13", "expect": "stale", "answer": "The latest long-term support version of Java is Java 17."},
-
-  {"id": "c01", "expect": "current", "answer": "Satya Nadella is the CEO of Microsoft."},
-  {"id": "c02", "expect": "current", "answer": "Jensen Huang is the CEO of Nvidia."},
-  {"id": "c03", "expect": "current", "answer": "Sundar Pichai is the CEO of Alphabet."},
-  {"id": "c04", "expect": "current", "answer": "Sam Altman is the CEO of OpenAI."},
-  {"id": "c05", "expect": "current", "answer": "Python 3.14 was released in October 2025."},
-  {"id": "c06", "expect": "current", "answer": "Keir Starmer became Prime Minister of the United Kingdom in July 2024."},
-  {"id": "c07", "expect": "current", "answer": "Los Angeles will host the 2028 Summer Olympics."},
-  {"id": "c08", "expect": "current", "answer": "Ubuntu 24.04 is a long-term support release."},
-  {"id": "c09", "expect": "current", "answer": "Argentina won the 2022 FIFA World Cup in Qatar."},
-  {"id": "c10", "expect": "current", "answer": "Lisa Su is the CEO of AMD."},
-
-  {"id": "t01", "expect": "timeless", "answer": "Water boils at 100 degrees Celsius at sea level."},
-  {"id": "t02", "expect": "timeless", "answer": "In Python, a list is mutable while a tuple is immutable."},
-  {"id": "t03", "expect": "timeless", "answer": "HTTP status code 404 means the requested resource was not found."},
-  {"id": "t04", "expect": "timeless", "answer": "The Pythagorean theorem says that in a right triangle a squared plus b squared equals c squared."},
-  {"id": "t05", "expect": "timeless", "answer": "To reverse a list in Python you can call list.reverse() or use slicing with [::-1]."},
-  {"id": "t06", "expect": "timeless", "answer": "TCP is connection-oriented while UDP is connectionless."},
-  {"id": "t07", "expect": "timeless", "answer": "William Shakespeare wrote Hamlet."}
+  {
+    "id": "s01",
+    "expect": "stale",
+    "answer": "The latest stable version of Python is 3.11."
+  },
+  {
+    "id": "s02",
+    "expect": "stale",
+    "answer": "The newest iPhone you can buy is the iPhone 15."
+  },
+  {
+    "id": "s03",
+    "expect": "stale",
+    "answer": "The current Prime Minister of the United Kingdom is Rishi Sunak."
+  },
+  {
+    "id": "s04",
+    "expect": "stale",
+    "answer": "Twitter's CEO is Parag Agrawal."
+  },
+  {
+    "id": "s05",
+    "expect": "stale",
+    "answer": "The latest long-term support release of Ubuntu is 22.04 LTS."
+  },
+  {
+    "id": "s06",
+    "expect": "stale",
+    "answer": "The latest major version of React is React 17."
+  },
+  {
+    "id": "s07",
+    "expect": "stale",
+    "answer": "OpenAI's most advanced publicly available model is GPT-4."
+  },
+  {
+    "id": "s08",
+    "expect": "stale",
+    "answer": "The reigning FIFA men's World Cup champion is France."
+  },
+  {
+    "id": "s09",
+    "expect": "stale",
+    "answer": "The newest Node.js LTS line is Node 18."
+  },
+  {
+    "id": "s10",
+    "expect": "stale",
+    "answer": "Windows 10 is Microsoft's newest desktop operating system."
+  },
+  {
+    "id": "s11",
+    "expect": "stale",
+    "answer": "The US Federal Reserve's target for the federal funds rate is 0 to 0.25 percent."
+  },
+  {
+    "id": "s12",
+    "expect": "stale",
+    "answer": "The Secretary-General of the United Nations is Ban Ki-moon."
+  },
+  {
+    "id": "s13",
+    "expect": "stale",
+    "answer": "The latest long-term support version of Java is Java 17."
+  },
+  {
+    "id": "s14",
+    "expect": "stale",
+    "answer": "A US first-class Forever stamp costs 66 cents."
+  },
+  {
+    "id": "s15",
+    "expect": "stale",
+    "answer": "Netflix's Standard plan in the US costs $15.49 per month."
+  },
+  {
+    "id": "s16",
+    "expect": "stale",
+    "answer": "Spotify Premium Individual costs $10.99 per month in the US."
+  },
+  {
+    "id": "s17",
+    "expect": "stale",
+    "answer": "The UK National Living Wage for workers aged 21 and over is £10.42 per hour."
+  },
+  {
+    "id": "s18",
+    "expect": "stale",
+    "answer": "The EU AI Act is still a proposal and has not been passed into law."
+  },
+  {
+    "id": "c01",
+    "expect": "current",
+    "answer": "Satya Nadella is the CEO of Microsoft."
+  },
+  {
+    "id": "c02",
+    "expect": "current",
+    "answer": "Jensen Huang is the CEO of Nvidia."
+  },
+  {
+    "id": "c03",
+    "expect": "current",
+    "answer": "Sundar Pichai is the CEO of Alphabet."
+  },
+  {
+    "id": "c04",
+    "expect": "current",
+    "answer": "Sam Altman is the CEO of OpenAI."
+  },
+  {
+    "id": "c05",
+    "expect": "current",
+    "answer": "Python 3.14 was released in October 2025."
+  },
+  {
+    "id": "c06",
+    "expect": "current",
+    "answer": "Keir Starmer became Prime Minister of the United Kingdom in July 2024."
+  },
+  {
+    "id": "c07",
+    "expect": "current",
+    "answer": "Los Angeles will host the 2028 Summer Olympics."
+  },
+  {
+    "id": "c08",
+    "expect": "current",
+    "answer": "Ubuntu 24.04 is a long-term support release."
+  },
+  {
+    "id": "c09",
+    "expect": "current",
+    "answer": "Argentina won the 2022 FIFA World Cup in Qatar."
+  },
+  {
+    "id": "c10",
+    "expect": "current",
+    "answer": "Lisa Su is the CEO of AMD."
+  },
+  {
+    "id": "c11",
+    "expect": "current",
+    "answer": "The US federal minimum wage is $7.25 per hour."
+  },
+  {
+    "id": "c12",
+    "expect": "current",
+    "answer": "The UK income tax personal allowance is £12,570."
+  },
+  {
+    "id": "t01",
+    "expect": "timeless",
+    "answer": "Water boils at 100 degrees Celsius at sea level."
+  },
+  {
+    "id": "t02",
+    "expect": "timeless",
+    "answer": "In Python, a list is mutable while a tuple is immutable."
+  },
+  {
+    "id": "t03",
+    "expect": "timeless",
+    "answer": "HTTP status code 404 means the requested resource was not found."
+  },
+  {
+    "id": "t04",
+    "expect": "timeless",
+    "answer": "The Pythagorean theorem says that in a right triangle a squared plus b squared equals c squared."
+  },
+  {
+    "id": "t05",
+    "expect": "timeless",
+    "answer": "To reverse a list in Python you can call list.reverse() or use slicing with [::-1]."
+  },
+  {
+    "id": "t06",
+    "expect": "timeless",
+    "answer": "TCP is connection-oriented while UDP is connectionless."
+  },
+  {
+    "id": "t07",
+    "expect": "timeless",
+    "answer": "William Shakespeare wrote Hamlet."
+  }
 ]

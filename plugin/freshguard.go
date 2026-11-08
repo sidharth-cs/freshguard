@@ -22,8 +22,9 @@ const (
 
 // Claim is a time-sensitive statement pulled out of an LLM answer.
 type Claim struct {
-	Claim string `json:"claim"`
-	Query string `json:"query"`
+	Claim        string `json:"claim"`
+	Query        string `json:"query"`
+	OfficialSite string `json:"official_site,omitempty"` // domain that publishes the current truth, e.g. "python.org"
 }
 
 // Evidence is one web result used to judge a claim.
@@ -32,6 +33,7 @@ type Evidence struct {
 	URL           string `json:"url"`
 	Content       string `json:"content"`
 	PublishedDate string `json:"published_date,omitempty"`
+	Official      bool   `json:"-"` // came from the claim's official site
 }
 
 // ClaimResult is the per-claim outcome returned to the caller.
@@ -48,6 +50,7 @@ type Report struct {
 	Status    string        `json:"status"` // "checked" | "no_claims" | "error"
 	Score     float64       `json:"score"`  // 0 (all stale) .. 1 (all current); -1 on error
 	Stale     int           `json:"stale"`
+	Cached    int           `json:"cached"` // claims answered from the cache, skipping search and judge
 	CheckedAt string        `json:"checked_at"`
 	LatencyMS int64         `json:"latency_ms"`
 	Timings   Timings       `json:"timings_ms"`
@@ -65,8 +68,8 @@ type Timings struct {
 // ChatFunc sends a system+user prompt to a model and returns the text reply.
 type ChatFunc func(ctx context.Context, system, user string) (string, error)
 
-// SearchFunc runs a web search and returns evidence.
-type SearchFunc func(ctx context.Context, query string) ([]Evidence, error)
+// SearchFunc runs a web search and returns evidence. domains, when set, limits results to those sites.
+type SearchFunc func(ctx context.Context, query string, domains []string) ([]Evidence, error)
 
 // Checker runs the extract -> search -> judge pipeline.
 type Checker struct {
@@ -74,6 +77,7 @@ type Checker struct {
 	Search    SearchFunc
 	MaxClaims int
 	Now       func() time.Time
+	Cache     *ClaimCache // optional; nil disables caching
 }
 
 const extractPrompt = `You find claims that may have gone out of date. Today is %s.
@@ -82,7 +86,8 @@ versions and releases, prices and plans, who holds a role, laws and regulations,
 Skip opinions, definitions, timeless facts, how-to steps, and dated historical events ("X happened in <year>"), which stay true.
 Quote each claim faithfully, keeping its tense and dates; never restate a past event ("became", "was released in") as a present-tense fact.
 For each claim write a short web search query that would reveal the CURRENT truth: name the subject plainly, include the current year, and do not repeat the claimed value (e.g. "latest stable Python release %s", not "Python 3.12 latest").
-Reply with JSON only: {"claims":[{"claim":"...","query":"..."}]}. Use {"claims":[]} if none.`
+Also give official_site: the one domain that publishes the authoritative current answer (e.g. "python.org", "gov.uk", "openai.com"), or "" if there is none.
+Reply with JSON only: {"claims":[{"claim":"...","query":"...","official_site":"..."}]}. Use {"claims":[]} if none.`
 
 const judgePrompt = `You verify whether claims are still current. Today is %s.
 For each numbered claim, use ONLY the web evidence given under it.
@@ -91,6 +96,7 @@ verdict:
 - "changed": evidence shows a newer or different value; put it in current_value
 - "unverifiable": evidence is missing, off-topic or conflicting
 Judge the claim exactly as worded. A claim about a dated past event ("became CEO in 2024", "was released in 2025") is "supported" if that event happened, even if things changed later.
+When evidence disagrees, trust results marked [official] and the most recently dated results over older or third-party pages.
 Cite the evidence URLs you relied on in sources. Never invent facts beyond the evidence.
 Reply with JSON only: {"verdicts":[{"id":1,"verdict":"...","current_value":"...","explanation":"one sentence","sources":["url"]}]}`
 
@@ -112,15 +118,35 @@ func (c *Checker) Check(ctx context.Context, answer string) (rep Report) {
 		return rep
 	}
 
-	stage = time.Now()
-	evidence := c.searchAll(ctx, claims)
-	rep.Timings.Search = time.Since(stage).Milliseconds()
+	// Reuse recent verdicts; only search and judge claims the cache has not seen.
+	results := make([]ClaimResult, len(claims))
+	var todo []Claim
+	var todoIdx []int
+	for i, cl := range claims {
+		if r, ok := c.Cache.Get(cl.Claim); ok {
+			r.Claim = cl.Claim
+			results[i] = r
+			rep.Cached++
+			continue
+		}
+		todo, todoIdx = append(todo, cl), append(todoIdx, i)
+	}
 
-	stage = time.Now()
-	results, err := c.judge(ctx, claims, evidence)
-	rep.Timings.Judge = time.Since(stage).Milliseconds()
-	if err != nil {
-		return errReport(rep, fmt.Errorf("judge: %w", err))
+	if len(todo) > 0 {
+		stage = time.Now()
+		evidence := c.searchAll(ctx, todo)
+		rep.Timings.Search = time.Since(stage).Milliseconds()
+
+		stage = time.Now()
+		fresh, err := c.judge(ctx, todo, evidence)
+		rep.Timings.Judge = time.Since(stage).Milliseconds()
+		if err != nil {
+			return errReport(rep, fmt.Errorf("judge: %w", err))
+		}
+		for j, r := range fresh {
+			results[todoIdx[j]] = r
+			c.Cache.Put(r.Claim, r)
+		}
 	}
 	rep.Status = "checked"
 	rep.Claims = results
@@ -164,21 +190,46 @@ func (c *Checker) extract(ctx context.Context, answer string) ([]Claim, error) {
 	return claims, nil
 }
 
-// searchAll searches every claim in parallel. A failed search yields no evidence
-// for that claim (the judge then marks it unverifiable) rather than failing the check.
+// searchAll searches every claim in parallel: the open web, plus the claim's official
+// site when the extractor named one. Official results come first, duplicates are dropped.
+// A failed search yields no evidence (the judge then marks the claim unverifiable).
 func (c *Checker) searchAll(ctx context.Context, claims []Claim) [][]Evidence {
-	out := make([][]Evidence, len(claims))
+	general := make([][]Evidence, len(claims))
+	official := make([][]Evidence, len(claims))
 	var wg sync.WaitGroup
+	run := func(dst *[]Evidence, q string, domains []string) {
+		defer wg.Done()
+		if ev, err := c.Search(ctx, q, domains); err == nil {
+			*dst = ev
+		}
+	}
 	for i, cl := range claims {
 		wg.Add(1)
-		go func(i int, q string) {
-			defer wg.Done()
-			if ev, err := c.Search(ctx, q); err == nil {
-				out[i] = ev
-			}
-		}(i, cl.Query)
+		go run(&general[i], cl.Query, nil)
+		if site := strings.TrimSpace(cl.OfficialSite); site != "" {
+			wg.Add(1)
+			go run(&official[i], cl.Query, []string{site})
+		}
 	}
 	wg.Wait()
+
+	out := make([][]Evidence, len(claims))
+	for i := range claims {
+		seen := map[string]bool{}
+		for _, ev := range official[i] {
+			if !seen[ev.URL] {
+				seen[ev.URL] = true
+				ev.Official = true
+				out[i] = append(out[i], ev)
+			}
+		}
+		for _, ev := range general[i] {
+			if !seen[ev.URL] {
+				seen[ev.URL] = true
+				out[i] = append(out[i], ev)
+			}
+		}
+	}
 	return out
 }
 
@@ -190,7 +241,11 @@ func (c *Checker) judge(ctx context.Context, claims []Claim, evidence [][]Eviden
 			b.WriteString("  (no evidence found)\n")
 		}
 		for _, ev := range evidence[i] {
-			fmt.Fprintf(&b, "  - [%s] %s %s\n    %s\n", ev.PublishedDate, ev.Title, ev.URL, truncate(ev.Content, maxEvidenceChars))
+			tag := ""
+			if ev.Official {
+				tag = "[official] "
+			}
+			fmt.Fprintf(&b, "  - %s[%s] %s %s\n    %s\n", tag, ev.PublishedDate, ev.Title, ev.URL, truncate(ev.Content, maxEvidenceChars))
 		}
 		b.WriteString("\n")
 	}
@@ -289,4 +344,55 @@ func truncate(s string, n int) string {
 func errReport(rep Report, err error) Report {
 	rep.Status, rep.Score, rep.Error = "error", -1, err.Error()
 	return rep
+}
+
+// ClaimCache remembers recent supported/changed verdicts so a repeated claim skips
+// search and judging. Unverifiable results are not cached: they may resolve next time.
+// ponytail: in-process map with a size cap; swap for Bifrost's cache store when sharing across replicas.
+type ClaimCache struct {
+	ttl time.Duration
+	now func() time.Time
+	mu  sync.Mutex
+	m   map[string]cacheEntry
+}
+
+type cacheEntry struct {
+	res ClaimResult
+	exp time.Time
+}
+
+const maxCacheEntries = 10000
+
+// NewClaimCache returns a cache whose entries live for ttl.
+func NewClaimCache(ttl time.Duration) *ClaimCache {
+	return &ClaimCache{ttl: ttl, now: time.Now, m: map[string]cacheEntry{}}
+}
+
+func cacheKey(claim string) string { return strings.ToLower(strings.Join(strings.Fields(claim), " ")) }
+
+// Get returns a cached result for claim if present and not expired.
+func (cc *ClaimCache) Get(claim string) (ClaimResult, bool) {
+	if cc == nil {
+		return ClaimResult{}, false
+	}
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+	e, ok := cc.m[cacheKey(claim)]
+	if !ok || cc.now().After(e.exp) {
+		return ClaimResult{}, false
+	}
+	return e.res, true
+}
+
+// Put stores a supported or changed result; anything else is ignored.
+func (cc *ClaimCache) Put(claim string, r ClaimResult) {
+	if cc == nil || (r.Verdict != VerdictSupported && r.Verdict != VerdictChanged) {
+		return
+	}
+	cc.mu.Lock()
+	defer cc.mu.Unlock()
+	if len(cc.m) >= maxCacheEntries {
+		cc.m = map[string]cacheEntry{} // ponytail: drop-all on overflow, LRU if hit rate matters
+	}
+	cc.m[cacheKey(claim)] = cacheEntry{res: r, exp: cc.now().Add(cc.ttl)}
 }
