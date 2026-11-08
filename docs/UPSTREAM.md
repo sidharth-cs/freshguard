@@ -1,6 +1,6 @@
 # Upstream proposal: FreshGuard for Bifrost
 
-Draft of the issue to open on [maximhq/bifrost](https://github.com/maximhq/bifrost). It proposes FreshGuard as a community plugin and raises one small core change that would make it, and plugins like it, cleaner.
+Opened as [maximhq/bifrost#9748](https://github.com/maximhq/bifrost/issues/9748). It proposes FreshGuard as a community plugin and raises one small core change that would make it, and plugins like it, cleaner.
 
 ---
 

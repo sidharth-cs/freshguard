@@ -14,11 +14,11 @@ re-checks them on the live web with [Tavily](https://tavily.com), and tells you 
 [![Eval](https://img.shields.io/badge/eval-18%2F18%20stale%20caught%20%C2%B7%200%2F19%20false-2f7a3b)](#-results)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-[Quickstart](#-quickstart) · [How it works](#-how-it-works) · [Results](#-results) · [Configuration](#%EF%B8%8F-configuration) · [Contributing](CONTRIBUTING.md)
+**[▶ Try it live](https://freshguard-demo.onrender.com)** · [Quickstart](#-quickstart) · [How it works](#-how-it-works) · [Results](#-results) · [Configuration](#%EF%B8%8F-configuration) · [Contributing](CONTRIBUTING.md)
 
 <img src="docs/demo-python.jpg" alt="FreshGuard demo: the model says Python 3.13.0 is the latest stable version; FreshGuard marks the claim changed, now Python 3.14.3, with a source link" width="760">
 
-▶ **[Watch the 48-second live demo](docs/demo.mp4)**: two real questions through Bifrost, both caught out of date with sources.
+**[Try it live](https://freshguard-demo.onrender.com)** (free hosting: the first visit after a quiet spell takes about a minute to wake up) · **[Watch the 48-second demo](docs/demo.mp4)**
 
 </div>
 
@@ -64,6 +64,8 @@ docker compose up --build     # builds Bifrost v2.4.0 + the plugin, then serves 
 Open **http://localhost:8000**. The image compiles Bifrost and FreshGuard with the same Go toolchain and flags (a requirement for Go plugins), runs the plugin's tests during the build, and keeps the gateway private inside the container (only the demo page is published; Bifrost's admin UI is not bundled, use Option C for it).
 
 ### Option B: hosted, one click
+
+Already running at **https://freshguard-demo.onrender.com**. To host your own:
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/sidharth-cs/freshguard)
 
@@ -249,7 +251,7 @@ Covers the pipeline with a fake model and search (stale detection, no claims, ma
 - [x] Check streaming responses
 - [x] One-command Docker setup and a hosted demo
 - [x] Pricing and regulation cases in the eval
-- [ ] Propose upstream as a Bifrost plugin ([draft](docs/UPSTREAM.md))
+- [x] Propose upstream as a Bifrost plugin ([maximhq/bifrost#9748](https://github.com/maximhq/bifrost/issues/9748))
 - [ ] Shared cache across gateway replicas (Bifrost's cache store)
 - [ ] A plugin-metadata field on Bifrost stream chunks, instead of `raw_response`
 - [ ] Larger, shared eval set
