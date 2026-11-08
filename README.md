@@ -14,7 +14,7 @@ re-checks them on the live web with [Tavily](https://tavily.com), and tells you 
 [![Eval](https://img.shields.io/badge/eval-18%2F18%20stale%20caught%20%C2%B7%200%2F19%20false-2f7a3b)](#-results)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-**[▶ Try it live](https://freshguard-demo.onrender.com)** · [Quickstart](#-quickstart) · [How it works](#-how-it-works) · [Results](#-results) · [Configuration](#%EF%B8%8F-configuration) · [Contributing](CONTRIBUTING.md)
+**[▶ Try it live](https://freshguard-demo.onrender.com)** · [Pitch deck](docs/FreshGuard-deck.pdf) · [Quickstart](#-quickstart) · [How it works](#-how-it-works) · [Results](#-results) · [Configuration](#%EF%B8%8F-configuration) · [Contributing](CONTRIBUTING.md)
 
 <img src="docs/demo-python.jpg" alt="FreshGuard demo: the model says Python 3.13.0 is the latest stable version; FreshGuard marks the claim changed, now Python 3.14.3, with a source link" width="760">
 
@@ -231,7 +231,7 @@ Plugin block in Bifrost's `config.json` (the full demo config, with relay and vi
 plugin/            Go plugin — hooks, Bifrost + Tavily clients (main.go), pipeline (freshguard.go), tests
 eval/              labelled cases + result tables
 demo/              demo page + stdlib proxy
-docs/              design notes (PRD, build spike, upstream proposal), screenshots, demo video
+docs/              pitch deck (PDF, PPTX), design notes (PRD, build spike, upstream proposal), screenshots, demo video
 dev.sh             build Bifrost (dynamic) + plugin, generate config, run (run | up)
 Dockerfile         one image: Bifrost + plugin + demo page (compose.yaml, render.yaml)
 ```
